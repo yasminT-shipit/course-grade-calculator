@@ -3,63 +3,51 @@ import matplotlib.pyplot as plt
 
 
 def main():
-    # === FIX PATHS - THIS IS CRITICAL ===
+    # Get the directory where this script is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(script_dir, "data")
 
-    # Verify data structure
-    print(f"Looking for data in: {data_dir}")
-    if not os.path.exists(data_dir):
-        print(f"ERROR: Data folder not found at {data_dir}")
-        return
-
-    # === DATA LOADING SECTION ===
     # 1. Load students data
     students = {}  # student_id -> name
     name_to_id = {}  # name -> student_id
-    students_path = os.path.join(data_dir, "students.txt")
-    if not os.path.exists(students_path):
-        print(f"ERROR: students.txt not found at {students_path}")
-        return
-    with open(students_path, 'r') as f:
+    with open(os.path.join(data_dir, "students.txt"), 'r') as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
-            student_id = line[-3:]  # Last 3 characters = ID
-            name = line[:-3].strip()
+            # Split by space - last token is ID, rest is name
+            tokens = line.split()
+            if len(tokens) < 2:
+                continue
+            student_id = tokens[-1]
+            name = " ".join(tokens[:-1])
             students[student_id] = name
             name_to_id[name] = student_id
 
     # 2. Load assignments data
     assignment_points = {}  # assignment_id -> points
     assignment_names = {}  # name -> assignment_id
-    assignments_path = os.path.join(data_dir, "assignments.txt")
-    if not os.path.exists(assignments_path):
-        print(f"ERROR: assignments.txt not found at {assignments_path}")
-        return
-    with open(assignments_path, 'r') as f:
+    with open(os.path.join(data_dir, "assignments.txt"), 'r') as f:
         lines = f.readlines()
         for i in range(0, len(lines), 3):  # Process in groups of 3
+            if i + 2 >= len(lines):
+                break
             name = lines[i].strip()
             assignment_id = lines[i + 1].strip()
-            points = int(lines[i + 2].strip())
+            try:
+                points = int(lines[i + 2].strip())
+            except ValueError:
+                continue
             assignment_points[assignment_id] = points
             assignment_names[name] = assignment_id
 
-    # 3. LOAD SUBMISSIONS FROM FOLDER (CRITICAL FIX)
+    # 3. Load submissions from folder
     submissions = {}  # (student_id, assignment_id) -> percentage
     submissions_dir = os.path.join(data_dir, "submissions")
 
-    if not os.path.exists(submissions_dir):
-        print(f"ERROR: submissions folder not found at {submissions_dir}")
-        return
-
-    # Process all .txt files in submissions folder
     for filename in os.listdir(submissions_dir):
         if filename.endswith('.txt'):
             # Extract student_id and assignment_id from filename
-            # Format: studentID_assignmentID.txt
             parts = filename[:-4].split('_')  # Remove .txt and split
             if len(parts) != 2:
                 continue
