@@ -2,7 +2,7 @@ import os
 import matplotlib.pyplot as plt
 
 def main():
-    # Parse students.txt correctly - ID is first 3 characters, no space
+    # Parse students.txt - ID is first 3 characters with no space before name
     student_id_to_name = {}
     student_name_to_id = {}
     
@@ -20,7 +20,7 @@ def main():
             student_id_to_name[student_id] = name
             student_name_to_id[name] = student_id
 
-    # Parse assignments.txt correctly
+    # Parse assignments.txt
     assignments = []
     assignment_name_to_id = {}
     assignment_id_to_points = {}
@@ -86,17 +86,12 @@ def main():
                             submissions_by_student[student_id] = {}
                         submissions_by_student[student_id][assignment_id] = percentage
     else:
-        # Fallback: process files directly in data directory (for older formats)
+        # Fallback: process files directly in data directory
         for filename in os.listdir('data'):
-            if filename in ['students.txt', 'assignments.txt']:
-                continue
-                
             file_path = os.path.join('data', filename)
-            # Make sure it's a file, not a directory
-            if os.path.isfile(file_path):
+            if os.path.isfile(file_path) and filename not in ['students.txt', 'assignments.txt']:
                 with open(file_path, 'r') as f_sub:
                     for line in f_sub:
-                        # Format: student_id|assignment_id|score
                         parts = line.strip().split('|')
                         if len(parts) < 3:
                             continue
@@ -108,16 +103,13 @@ def main():
                         except ValueError:
                             continue
                         
-                        # Verify this is a valid assignment ID
                         if assignment_id not in assignment_id_to_points:
                             continue
                         
-                        # Store by assignment
                         if assignment_id not in submissions_by_assignment:
                             submissions_by_assignment[assignment_id] = []
                         submissions_by_assignment[assignment_id].append(percentage)
                         
-                        # Store by student
                         if student_id not in submissions_by_student:
                             submissions_by_student[student_id] = {}
                         submissions_by_student[student_id][assignment_id] = percentage
