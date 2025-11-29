@@ -2,142 +2,124 @@ import os
 import matplotlib.pyplot as plt
 
 def main():
-    # Get the directory where this script is located
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    data_dir = os.path.join(script_dir, "data")
-
-    # 1. Load students data - FIXED PARSING
-    students = {}  # student_id -> name
-    name_to_id = {}  # name -> student_id
-    with open(os.path.join(data_dir, "students.txt"), 'r') as f:
+    student_id_to_name = {}
+    student_name_to_id = {}
+    with open('data/students.txt', 'r') as f:
         for line in f:
-            line = line.strip()
-            if not line:
+            parts = line.split()
+            if not parts:
                 continue
-            # Find the 3-digit ID at the end (with possible leading zeros)
-            for i in range(len(line)):
-                if i >= 3 and line[i-3:i+1].isdigit() and (i == len(line) or not line[i].isdigit()):
-                    student_id = line[i-3:i]
-                    name = line[:i-3].strip()
-                    students[student_id] = name
-                    name_to_id[name] = student_id
-                    break
-            else:
-                # Fallback: last 3 characters
-                student_id = line[-3:]
-                name = line[:-3].strip()
-                students[student_id] = name
-                name_to_id[name] = student_id
-
-    # 2. Load assignments data - FIXED PARSING
-    assignment_points = {}  # assignment_id -> points
-    assignment_names = {}  # name -> assignment_id
-    with open(os.path.join(data_dir, "assignments.txt"), 'r') as f:
-        lines = f.readlines()
-        for i in range(0, len(lines), 3):
-            if i + 2 >= len(lines):
-                break
-            name = lines[i].strip()
-            assignment_id = lines[i+1].strip()
-            try:
-                points = int(lines[i+2].strip())
-            except ValueError:
-                continue
-            assignment_points[assignment_id] = points
-            assignment_names[name] = assignment_id
-
-    # 3. Load submissions from folder
-    submissions = {}  # (student_id, assignment_id) -> percentage
-    submissions_dir = os.path.join(data_dir, "submissions")
-    
-    for filename in os.listdir(submissions_dir):
-        if filename.endswith('.txt'):
-            # Extract student_id and assignment_id from filename
-            parts = filename[:-4].split('_')  # Remove .txt and split
-            if len(parts) != 2:
-                continue
-                
             student_id = parts[0]
-            assignment_id = parts[1]
-            
-            # Read the percentage from the file
-            file_path = os.path.join(submissions_dir, filename)
-            try:
-                with open(file_path, 'r') as f:
-                    percentage = float(f.read().strip())
-                    submissions[(student_id, assignment_id)] = percentage
-            except (ValueError, FileNotFoundError):
-                continue
+            name = ' '.join(parts[1:])
+            student_id_to_name[student_id] = name
+            student_name_to_id[name] = student_id
 
-    # === MENU SECTION ===
+    assignments = []
+    assignment_name_to_id = {}
+    assignment_id_to_info = {}
+    with open('data/assignments.txt', 'r') as f:
+        lines = [line.strip() for line in f if line.strip()]
+        i = 0
+        while i < len(lines):
+            name = lines[i]
+            i += 1
+            if i >= len(lines):
+                break
+            assignment_id = lines[i]
+            i += 1
+            if i >= len(lines):
+                break
+            points = int(lines[i])
+            i += 1
+            assignments.append((name, assignment_id, points))
+            assignment_name_to_id[name] = assignment_id
+            assignment_id_to_info[assignment_id] = (name, points)
+    
+    total_possible = sum(points for _, _, points in assignments)
+    
+    submissions_by_assignment = {}
+    submissions_by_student = {}
+    
+    data_dir = 'data'
+    for filename in os.listdir(data_dir):
+        if filename == 'students.txt' or filename == 'assignments.txt':
+            continue
+        if len(filename) in (4, 5) and filename.isdigit():
+            assignment_id = filename
+            file_path = os.path.join(data_dir, filename)
+            with open(file_path, 'r') as f_sub:
+                for line in f_sub:
+                    parts = line.split()
+                    if len(parts) < 2:
+                        continue
+                    student_id = parts[0]
+                    try:
+                        percentage = float(parts[1])
+                    except ValueError:
+                        continue
+                    
+                    if assignment_id not in submissions_by_assignment:
+                        submissions_by_assignment[assignment_id] = []
+                    submissions_by_assignment[assignment_id].append(percentage)
+                    
+                    if student_id not in submissions_by_student:
+                        submissions_by_student[student_id] = {}
+                    submissions_by_student[student_id][assignment_id] = percentage
+
     print("1. Student grade")
     print("2. Assignment statistics")
     print("3. Assignment graph")
-    choice = input("Enter your selection: ").strip()
-
-    # === OPTION 1: STUDENT GRADE ===
-    if choice == "1":
+    print()
+    selection = input("Enter your selection: ").strip()
+    
+    if selection == '1':
         name = input("What is the student's name: ").strip()
-        if name not in name_to_id:
+        if name not in student_name_to_id:
             print("Student not found")
-            return
-
-        student_id = name_to_id[name]
-        total_points = 0
-        for assignment_id, points in assignment_points.items():
-            key = (student_id, assignment_id)
-            if key in submissions:
-                earned = (submissions[key] / 100) * points
-                total_points += earned
-
-        grade = round((total_points / 1000) * 100)  # Total possible = 1000
-        print(f"{grade}%")
-
-    # === OPTION 2: ASSIGNMENT STATISTICS ===
-    elif choice == "2":
+        else:
+            student_id = student_name_to_id[name]
+            total_points_earned = 0.0
+            for _, assignment_id, points in assignments:
+                if student_id in submissions_by_student and assignment_id in submissions_by_student[student_id]:
+                    percentage = submissions_by_student[student_id][assignment_id]
+                    points_earned = (percentage * points) / 100.0
+                    total_points_earned += points_earned
+            grade_percent = (total_points_earned / total_possible) * 100.0
+            grade_percent = round(grade_percent)
+            print(f"{int(grade_percent)}%")
+            
+    elif selection == '2':
         assignment_name = input("What is the assignment name: ").strip()
-        if assignment_name not in assignment_names:
+        if assignment_name not in assignment_name_to_id:
             print("Assignment not found")
-            return
-
-        assignment_id = assignment_names[assignment_name]
-        scores = [
-            submissions[(sid, assignment_id)]
-            for (sid, aid), score in submissions.items()
-            if aid == assignment_id
-        ]
-
-        if not scores:
-            print("Assignment not found")
-            return
-
-        min_score = round(min(scores))
-        avg_score = round(sum(scores) / len(scores))
-        max_score = round(max(scores))
-        print(f"Min: {min_score}%")
-        print(f"Avg: {avg_score}%")
-        print(f"Max: {max_score}%")
-
-    # === OPTION 3: ASSIGNMENT GRAPH ===
-    elif choice == "3":
+        else:
+            assignment_id = assignment_name_to_id[assignment_name]
+            if assignment_id not in submissions_by_assignment:
+                print("Assignment not found")
+            else:
+                percentages = submissions_by_assignment[assignment_id]
+                min_val = min(percentages)
+                max_val = max(percentages)
+                avg_val = sum(percentages) / len(percentages)
+                min_val = round(min_val)
+                max_val = round(max_val)
+                avg_val = round(avg_val)
+                print(f"Min: {int(min_val)}%")
+                print(f"Avg: {int(avg_val)}%")
+                print(f"Max: {int(max_val)}%")
+                
+    elif selection == '3':
         assignment_name = input("What is the assignment name: ").strip()
-        if assignment_name not in assignment_names:
+        if assignment_name not in assignment_name_to_id:
             print("Assignment not found")
-            return
-
-        assignment_id = assignment_names[assignment_name]
-        scores = [
-            submissions[(sid, assignment_id)]
-            for (sid, aid), score in submissions.items()
-            if aid == assignment_id
-        ]
-
-        plt.hist(scores, bins=[0, 25, 50, 75, 100], edgecolor='black')
-        plt.title(f"{assignment_name} Scores")
-        plt.xlabel("Percentage Score")
-        plt.ylabel("Number of Students")
-        plt.xticks([0, 25, 50, 75, 100])
-        plt.show()
+        else:
+            assignment_id = assignment_name_to_id[assignment_name]
+            if assignment_id not in submissions_by_assignment:
+                print("Assignment not found")
+            else:
+                percentages = submissions_by_assignment[assignment_id]
+                plt.hist(percentages, bins=[0, 25, 50, 75, 100])
+                plt.show()
 
 if __name__ == "__main__":
     main()
